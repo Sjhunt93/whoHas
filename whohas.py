@@ -1,9 +1,14 @@
 from abc import ABC
 from hashlib import md5
 import json
+from enum import Enum, auto
 
-class GroupInterface:
-    pass
+
+class OutputHelper():
+    def format_actions(action):
+        return "any action" if action == "*" else action
+    def format_resource(resource):
+        return "any resource" if resource == "*" else f"{resource} resource"
 
 class Hasher:
     HashType = 'plain' # or md5
@@ -21,6 +26,17 @@ class Hasher:
             raise Hasher.UnhashableType(f"Cannot hash type {type(var)}")
 
 class AuthoriserBackend(ABC):
+    class Queries:
+        class Types(Enum):
+            actor = auto
+            role = auto
+            group = auto
+            resource = auto
+        #class Condition(Enum):
+
+
+
+
     # the backend allows the end-user to choose a database or local storage device
     # actor and resource are hashable types (so str)
     # for performance reasons do as little validation in the backend as possible
@@ -41,6 +57,7 @@ class AuthoriserBackend(ABC):
     def groups_for_actor(self, group_name):
         pass
 
+    # def query(self, actor, )
     # depending on your backend you might have to save and load the data
     # for example if you use dynamodb then save/load makes 0 sense
     def save():
@@ -109,6 +126,24 @@ class JsonBackend(AuthoriserBackend):
     def groups_for_actor(self, group_name):
         return self.groups.get(group_name, [])
     
+    def query_actor(self, actor):
+        output = []
+        permissions = self.data_structure.get(actor, {})
+        print(permissions)
+        for resource, actions in permissions.items():
+            print("\t", resource, actions)
+            for a in actions:
+                output.append(f"Can perform {OutputHelper.format_actions(a)} on resource {OutputHelper.format_resource(resource)}")
+        groups = self.groups_for_actor(actor)
+        for g in groups:
+            perms = self.data_structure.get(g, {})
+            for resource, actions in perms.items():
+                for a in actions:
+                    output.append(f"Can perform {OutputHelper.format_actions(a)} on resource {OutputHelper.format_resource(resource)}")
+            
+        print(permissions)
+        return output
+
     def save():
         pass
     def load():
@@ -185,3 +220,7 @@ for action in ["k8:update", "k8:create", "k8:monitor", "k8:delete"]:
     assert auth_interface.can_this("lars", action, on_resource="super-cluster-2")
 
 assert not auth_interface.can_this("lars", "k8:destroy", on_resource="super-cluster-2")
+
+items = auth_interface.backend.query_actor("lars")
+for i in items:
+    print(i)
